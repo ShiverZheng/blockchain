@@ -3,7 +3,7 @@
 Here is the [tutorial](https://mycoralhealth.medium.com/code-your-own-blockchain-in-less-than-200-lines-of-go-e296282bcffc)
 
 
-### [Basic blockchain](https://github.com/ShiverZheng/blockchain)
+### [Basic blockchain](https://github.com/ShiverZheng/blockchain/tree/basic)
 
 Get Blockchain
 ```shell
