@@ -163,5 +163,5 @@ func main() {
 		spew.Dump(genesisBlock)
 		Blockchain = append(Blockchain, genesisBlock)
 	}()
-	log.Fatal((run()))
+	log.Fatal(run())
 }
