@@ -24,3 +24,17 @@ $ go run .
 ```
 
 Open a new terminal, typing `nc localhost 9000` and then follow the prompts.
+
+### [Proof-of-Work](https://github.com/ShiverZheng/blockchain/tree/proof-of-work)
+
+Set the difficulty in `blockchain.go`
+
+```shell
+$ go run .
+```
+
+```shell
+$ curl -d '{ "BPM": 66 }' -X POST localhost:9000
+```
+
+Wait for the hash value that meets the requirements to be calculated.
