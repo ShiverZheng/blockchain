@@ -3,56 +3,40 @@ package main
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"strconv"
+	"strings"
 	"time"
 )
 
+// 散列0的数量，所需的0越多，越难找到正确的Hash值
+const difficulty = 1
+
 type Block struct {
-	Index     int    // 数据记录在区块中的位置
-	Timestamp string // 自动确定的写入data的时间
-	BPM       int    // 自定义数据（这里用来记录每分钟的心跳）
-	Hash      string // 此数据记录的SHA256标识符
-	PrevHash  string // 上一条记录的SHA256标识符
+	Index      int    // 增量
+	Timestamp  string // 当前时间的字符串表示
+	BPM        int    // 心率
+	Hash       string // 当前区块的Hash
+	PrevHash   string // 前一个区块的Hash
+	Difficulty int    // 难度系数，与Hash前缀0的数量相等
+	Nonce      string // 从零开始的自增16进制
 }
 
-var Blockchain []Block // 区块链
+var Blockchain []Block
 
-// 计算区块索引、时间戳、数据以及上一个区块hash的hash
-func calculateHash(block Block) string {
-	record := strconv.Itoa(block.Index) + block.Timestamp + strconv.Itoa(block.BPM) + block.PrevHash
-	h := sha256.New()
-	h.Write([]byte(record))
-	hashed := h.Sum(nil)
-	return hex.EncodeToString(hashed)
+type Message struct {
+	BPM int
 }
 
-// 生成区块
-func generateBlock(oldBlock Block, BPM int) (Block, error) {
-	var newBlock Block
-	t := time.Now()
-
-	newBlock.Index = oldBlock.Index + 1
-	newBlock.Timestamp = t.String()
-	newBlock.BPM = BPM
-	newBlock.PrevHash = oldBlock.Hash
-	newBlock.Hash = calculateHash(newBlock)
-
-	return newBlock, nil
-}
-
-// 区块验证
 func isBlockValid(newBlock, oldBlock Block) bool {
-	// 检查 Index 确保它们按预期加1
 	if oldBlock.Index+1 != newBlock.Index {
 		return false
 	}
 
-	// 检查 PrevHash 与前一个块的 Hash 相同
 	if oldBlock.Hash != newBlock.PrevHash {
 		return false
 	}
 
-	// 在当前块上计算 Hash 来确认哈希值是否一致
 	if calculateHash(newBlock) != newBlock.Hash {
 		return false
 	}
@@ -60,11 +44,53 @@ func isBlockValid(newBlock, oldBlock Block) bool {
 	return true
 }
 
-// 选择较长的链来作为正确的区块链
-func replaceChain(newBlocks []Block) {
-	mutex.Lock()
-	if len(newBlocks) > len(Blockchain) {
-		Blockchain = newBlocks
+// 将Nonce加入Hash计算
+func calculateHash(block Block) string {
+	record := strconv.Itoa(block.Index) + block.Timestamp + strconv.Itoa(block.BPM) + block.PrevHash + block.Nonce
+	h := sha256.New()
+	h.Write([]byte(record))
+	hashed := h.Sum(nil)
+	return hex.EncodeToString(hashed)
+}
+
+// 验证Hash的前缀零是否与难度数量相等
+func isHashValid(hash string, difficulty int) bool {
+	prefix := strings.Repeat("0", difficulty)
+	return strings.HasPrefix(hash, prefix)
+}
+
+// 生成返回符合工作量证明的区块
+func generateBlock(oldBlock Block, BPM int) Block {
+	var newBlock Block
+
+	t := time.Now()
+
+	// 初始化区块
+	newBlock.Index = oldBlock.Index + 1
+	newBlock.Timestamp = t.String()
+	newBlock.BPM = BPM
+	newBlock.PrevHash = oldBlock.Hash
+	newBlock.Difficulty = difficulty
+
+	for i := 0; ; i++ {
+		// 将i转换成16进制，并赋值给Nonce
+		hex := fmt.Sprintf("%x", i)
+		fmt.Println(hex)
+		// 通过i计算Hash，Nonce从0开始，检查Hash结果是否与定义的difficulty相同
+		newBlock.Nonce = hex
+		if !isHashValid(calculateHash(newBlock), newBlock.Difficulty) {
+			fmt.Println(calculateHash(newBlock), " do more work!")
+			// 模拟需要一些时间来解决工作量证明
+			time.Sleep(time.Second)
+			// 一直循环，直到得到想要的前导零的数量，表示完成了工作证明
+			continue
+		} else {
+			hash := calculateHash(newBlock)
+			fmt.Println(hash, " Work Done!")
+			newBlock.Hash = hash
+			break
+		}
 	}
-	mutex.Unlock()
+
+	return newBlock
 }
