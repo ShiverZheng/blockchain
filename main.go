@@ -1,90 +1,14 @@
 package main
 
 import (
-	"encoding/json"
-	"io"
 	"log"
-	"net/http"
+	"net"
 	"os"
-	"sync"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
 )
-
-var mutex = &sync.Mutex{}
-
-func respondWithJSON(w http.ResponseWriter, r *http.Request, code int, payload interface{}) {
-	w.Header().Set("Content-Type", "application/json")
-	response, err := json.MarshalIndent(payload, "", "  ")
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("HTTP 500: Internal Server Error"))
-		return
-	}
-	w.WriteHeader(code)
-	w.Write(response)
-}
-
-func handleGetBlockchain(w http.ResponseWriter, r *http.Request) {
-	bytes, err := json.MarshalIndent(Blockchain, "", "  ")
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	io.WriteString(w, string(bytes))
-}
-
-func handleWriteBlock(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	var m Message
-
-	decoder := json.NewDecoder(r.Body)
-	if err := decoder.Decode(&m); err != nil {
-		respondWithJSON(w, r, http.StatusBadRequest, r.Body)
-		return
-	}
-	defer r.Body.Close()
-
-	mutex.Lock()
-	newBlock := generateBlock(Blockchain[len(Blockchain)-1], m.BPM)
-	mutex.Unlock()
-
-	if isBlockValid(newBlock, Blockchain[len(Blockchain)-1]) {
-		Blockchain = append(Blockchain, newBlock)
-		spew.Dump(Blockchain)
-	}
-
-	respondWithJSON(w, r, http.StatusCreated, newBlock)
-}
-
-func makeMuxRouter() http.Handler {
-	muxRouter := mux.NewRouter()
-	muxRouter.HandleFunc("/", handleGetBlockchain).Methods("GET")
-	muxRouter.HandleFunc("/", handleWriteBlock).Methods("POST")
-	return muxRouter
-}
-
-func run() error {
-	mux := makeMuxRouter()
-	httpAddr := os.Getenv("ADDR")
-	log.Println("Listening on", os.Getenv("ADDR"))
-	s := &http.Server{
-		Addr:           ":" + httpAddr,
-		Handler:        mux,
-		ReadTimeout:    10 * time.Second,
-		WriteTimeout:   10 * time.Second,
-		MaxHeaderBytes: 1 << 20,
-	}
-
-	if err := s.ListenAndServe(); err != nil {
-		return err
-	}
-
-	return nil
-}
 
 func main() {
 	err := godotenv.Load()
@@ -92,16 +16,43 @@ func main() {
 		log.Fatal(err)
 	}
 
-	go func() {
-		t := time.Now()
-		gensisBlock := Block{}
-		gensisBlock = Block{0, t.String(), 0, calculateHash(gensisBlock), "", difficulty, ""}
-		spew.Dump(gensisBlock)
+	// create genesis block
+	t := time.Now()
+	genesisBlock := Block{}
+	genesisBlock = Block{0, t.String(), 0, calculateBlockHash(genesisBlock), "", ""}
+	spew.Dump(genesisBlock)
+	Blockchain = append(Blockchain, genesisBlock)
 
-		mutex.Lock()
-		Blockchain = append(Blockchain, gensisBlock)
-		mutex.Unlock()
+	// start TCP and serve TCP server
+	server, err := net.Listen("tcp", ":"+os.Getenv("ADDR"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer server.Close()
+
+	// 启动一个线程从 candidateBlocks 通道中取出块
+	// 并用它们填充 tempBlocks 容器
+	// 以便 pickWinner 进一步处理
+	go func() {
+		for candidate := range candidateBlocks {
+			mutex.Lock()
+			tempBlocks = append(tempBlocks, candidate)
+			mutex.Unlock()
+		}
 	}()
 
-	log.Fatal(run())
+	// 为 pickWinner 启动另一个 Go 线程
+	go func() {
+		for {
+			pickWinner()
+		}
+	}()
+
+	for {
+		conn, err := server.Accept()
+		if err != nil {
+			log.Fatal(err)
+		}
+		go handleConn(conn)
+	}
 }
