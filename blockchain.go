@@ -53,7 +53,7 @@ func calculateHash(s string) string {
 
 // 连接其所有字段来散列块的内容
 func calculateBlockHash(block Block) string {
-	record := fmt.Sprint(block.Index) + block.Timestamp + fmt.Sprint(block.BPM) + block.PrevHash
+	record := strconv.Itoa(block.Index) + block.Timestamp + strconv.Itoa(block.BPM) + block.PrevHash
 	return calculateHash(record)
 }
 
