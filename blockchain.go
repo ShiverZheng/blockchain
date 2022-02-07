@@ -243,8 +243,8 @@ func pickWinner() {
 				Blockchain = append(Blockchain, block)
 				mutex.Unlock()
 
-				// 向其他赢得彩票的节点宣布获胜者
-				for _ = range validators {
+				// 向其他节点宣布获胜者
+				for range validators {
 					announcements <- "\nwinning validator: " + lotteryWinner + "\n"
 				}
 				break
