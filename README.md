@@ -77,3 +77,42 @@ A winner is chosen!
 Wait a little while again...
 
 We see our new blockchain broadcast to all our terminals, with our winning validator’s block containing his BPM in the newest block!
+
+### [P2P](https://github.com/ShiverZheng/blockchain/tree/p2p)
+
+Serve P2P Host server
+
+```shell
+$ go run . -l 10000 -secio
+```
+
+Follow the prompts, then open another terminal.
+
+```shell
+$ go run . -l 10001 -d <given address in the instructions> -secio
+```
+
+You'll see the first terminal detected the new connection!
+
+Follow the prompts in the 2nd terminal, open a 3rd terminal.
+
+```shell
+$ go run main.go -l 10002 -d <given address in the instructions> -secio
+```
+
+Check out the 2nd terminal, which detected the connection from the 3rd terminal.
+
+Now let’s start inputting our BPM data. Type in “70” in our 1st terminal, give it a few seconds and watch what happens in each terminal.
+
+#### What just happened here?
+
+1. Terminal 1 added a new block to its blockchain
+2. It then broadcast it to Terminal 2
+3. Terminal 2 compared it against its own blockchain, which only contained its genesis block. It saw Terminal 1 had a longer chain so it replaced its own chain with Terminal 1’s chain. Then it broadcast the new chain to Terminal 3.
+4. Terminal 3 compared the new chain against its own and replaced it.
+
+Let’s test it again but this time allow Terminal 2 to add a block. Type in “80” into Terminal 2.
+
+This time Terminal 2 added a new block and broadcast it to the rest of the network.
+
+Each of the peers ran its own internal checks and updated their blockchains to the latest blockchain of the network!
